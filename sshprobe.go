@@ -10,38 +10,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/umegbewe/sshprobe/helpers"
 
 	"fmt"
-	"log"
 )
 
 var instance []string
 
-func ssh(keyname string, user string, address string) {
 
-	fmt.Println("ssh", "-tt", user+"@"+address, "-i", "~/.ssh/"+keyname)
-	cmd := exec.Command("ssh", "-tt", user+"@"+address, "-i", "~/.ssh/"+keyname)
-
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-
-	if err := cmd.Run(); err != nil {
-		fmt.Println(err.Error())
-	}
-}
-
-// helper function
-func StrOrDefault(s *string, defaultVal string) string {
-	if s == nil {
-		return defaultVal
-	} else {
-		return *s
-	}
-}
-
-func GetInstances() {
-
+func GetInstances() ([]ec2.Instance, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
@@ -59,9 +36,10 @@ func GetInstances() {
 
 	resp, err := svc.DescribeInstances(params)
 	if err != nil {
-		fmt.Println("there was an error listing instances in", err.Error())
-		log.Fatal(err.Error())
+		return nil, fmt.Errorf("Couldn't list instances: %v", err)
 	}
+
+	var instances []ec2.Instance
 
 	for _, res := range resp.Reservations {
 		if res.Instances == nil {
@@ -70,67 +48,100 @@ func GetInstances() {
 
 		for _, inst := range res.Instances {
 			if inst == nil {
-				fmt.Println("None")
 				continue
 			}
 
-			instance = []string{
-				*inst.PrivateIpAddress,
-				StrOrDefault(inst.PublicIpAddress, "None"),
-				*inst.State.Name,
-				StrOrDefault(inst.KeyName, "None"),
+			instance := ec2.Instance{
+				PrivateIpAddress: inst.PrivateIpAddress,
+				PublicIpAddress:  inst.PublicIpAddress,
+				State:            inst.State,
+				KeyName:          inst.KeyName,
 			}
 
-			fmt.Println(strings.Join(instance, " | "))
+			instances = append(instances, instance)
 		}
+	}
+
+	return instances, nil
+}
+
+func ssh(keyname string, user string, address string) {
+
+	fmt.Println("ssh", "-tt", user+"@"+address, "-i", "~/.ssh/"+keyname)
+	cmd := exec.Command("ssh", "-tt", user+"@"+address, "-i", "~/.ssh/"+keyname)
+	fmt.Println("I was called")
+	
+
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+
+	if err := cmd.Run(); err != nil {
+		fmt.Println(err.Error())
 	}
 }
 
-func Filter() string {
+func Filter() []ec2.Instance {
+	instances, err := GetInstances()
+	if err != nil {
+		fmt.Errorf("Couldn't list instances: %v", err)
+		return []ec2.Instance{}
+	}
 
-	stdout := os.Stdout
-	fmt.Println("starting")
+	var instanceOutput strings.Builder
+	for _, instance := range instances {
+		instanceOutput.WriteString(fmt.Sprintf("%s | %s | %s | %s\n",
+			helpers.StrOrDefault(instance.PrivateIpAddress, "None"),
+			helpers.StrOrDefault(instance.PublicIpAddress, "None"),
+			*instance.State.Name,
+			helpers.StrOrDefault(instance.KeyName, "None"),
+		))
+	}
+
+	// Convert the instances output to an io.Reader
+	instancesReader := strings.NewReader(instanceOutput.String())
+
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	GetInstances()
-
-	ChnOut := make(chan string)
-
-	go func() {
-		var buf bytes.Buffer
-		io.Copy(&buf, r)
-		ChnOut <- buf.String()
-	}()
-
-	w.Close()
-	os.Stdout = stdout
-	str := buf.String()
-
 	cmd := exec.Command("fzf", "--multi")
-
-	out := bytes.NewBufferString(str)
-
-	cmd.Stdin = out
+	cmd.Stdin = instancesReader
 	cmd.Stderr = os.Stderr
-
 	if err := cmd.Run(); cmd.ProcessState.ExitCode() == 130 {
-		return ""
+		return []ec2.Instance{}
 	} else if err != nil {
-		fmt.Errorf("Couldn't call fzf", err)
+		fmt.Errorf("Couldn't call fzf: %v", err)
+		return []ec2.Instance{}
 	}
 
-	result := out.String()
+	w.Close()
 
-	fmt.Println(result)
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
 
-	return result
+	fzfOutput := buf.String()
 
+	selectedInstances := strings.Split(fzfOutput, "\n")
+
+	var filteredInstances []ec2.Instance
+	for _, instance := range selectedInstances {
+		privateIPAddress := strings.Split(instance, "|")[0]
+
+		privateIPAddress = strings.TrimSpace(privateIPAddress)
+
+		for _, i := range instances {
+			if *i.PrivateIpAddress == privateIPAddress {
+				filteredInstances = append(filteredInstances,  i)
+			}
+		}
+	}
+
+	return filteredInstances
 }
 
 func main() {
-	str := strings.Split(Filter(), " , ")
-
-	fmt.Println(str)
+	selectedInstances := Filter()
+	for _, instance := range selectedInstances {
+		ssh(*instance.KeyName, "ubuntu", *instance.PrivateIpAddress)
+	}
 }
-
