@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,7 +15,6 @@ import (
 )
 
 var instance []string
-
 
 func GetInstances() ([]ec2.Instance, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -67,10 +65,8 @@ func GetInstances() ([]ec2.Instance, error) {
 
 func ssh(keyname string, user string, address string) {
 
-	fmt.Println("ssh", "-tt", user+"@"+address, "-i", "~/.ssh/"+keyname)
-	cmd := exec.Command("ssh", "-tt", user+"@"+address, "-i", "~/.ssh/"+keyname)
-	fmt.Println("I was called")
-	
+	fmt.Println("ssh", "-o ConnectTimeout=10", user+"@"+address, "-i", "~/.ssh/"+keyname)
+	cmd := exec.Command("ssh", "-o ConnectTimeout=10", user+"@"+address, "-i", "~/.ssh/"+keyname)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
@@ -84,8 +80,7 @@ func ssh(keyname string, user string, address string) {
 func Filter() []ec2.Instance {
 	instances, err := GetInstances()
 	if err != nil {
-		fmt.Errorf("Couldn't list instances: %v", err)
-		return []ec2.Instance{}
+		fmt.Printf("Couldn't list instances: %v", err)
 	}
 
 	var instanceOutput strings.Builder
@@ -101,27 +96,19 @@ func Filter() []ec2.Instance {
 	// Convert the instances output to an io.Reader
 	instancesReader := strings.NewReader(instanceOutput.String())
 
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
+	var buf bytes.Buffer
 	cmd := exec.Command("fzf", "--multi")
 	cmd.Stdin = instancesReader
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); cmd.ProcessState.ExitCode() == 130 {
-		return []ec2.Instance{}
-	} else if err != nil {
-		fmt.Errorf("Couldn't call fzf: %v", err)
-		return []ec2.Instance{}
+	cmd.Stdout = &buf
+
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Couldn't call command: %v\n", err)
 	}
-
-	w.Close()
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
 
 	fzfOutput := buf.String()
 
-	selectedInstances := strings.Split(fzfOutput, "\n")
+	selectedInstances := strings.Split(fzfOutput, " | ")
 
 	var filteredInstances []ec2.Instance
 	for _, instance := range selectedInstances {
