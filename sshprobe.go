@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"os"
 	"os/exec"
 	"strings"
@@ -15,6 +16,7 @@ import (
 )
 
 var instance []string
+
 
 func GetInstances() ([]ec2.Instance, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -119,8 +121,6 @@ func Filter() []ec2.Instance {
 
 		privateIPAddress = strings.TrimSpace(privateIPAddress)
 
-		// fmt.Println(privateIPAddress)
-
 		for _, i := range instances {
 			if *i.PrivateIpAddress == privateIPAddress {
 				filteredInstances = append(filteredInstances,  i)
@@ -132,11 +132,13 @@ func Filter() []ec2.Instance {
 }
 
 func main() {
+	var user = flag.String("user", "ubuntu", "Username to use")
+	flag.Parse()
 	selectedInstances := Filter()
 	for _, instance := range selectedInstances {
-		err := ssh(*instance.KeyName, "ubuntu", *instance.PublicIpAddress)
+		err := ssh(*instance.KeyName, *user, *instance.PublicIpAddress)
 		if err != nil {
-			err = ssh(*instance.KeyName, "ubuntu", *instance.PrivateIpAddress)
+			err = ssh(*instance.KeyName, *user, *instance.PrivateIpAddress)
 		}
 	}
 }
