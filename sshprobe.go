@@ -63,18 +63,21 @@ func GetInstances() ([]ec2.Instance, error) {
 	return instances, nil
 }
 
-func ssh(keyname string, user string, address string) {
+func ssh(keyname string, user string, address string) error {
+	var err error
 
-	fmt.Println("ssh", "-o ConnectTimeout=10", user+"@"+address, "-i", "~/.ssh/"+keyname)
-	cmd := exec.Command("ssh", "-o ConnectTimeout=10", user+"@"+address, "-i", "~/.ssh/"+keyname)
+	fmt.Println("ssh", "-o ConnectTimeout=5", user+"@"+address, "-i", "~/.ssh/"+keyname)
+	cmd := exec.Command("ssh", "-o ConnectTimeout=5", user+"@"+address, "-i", "~/.ssh/"+keyname)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 
-	if err := cmd.Run(); err != nil {
+	if err = cmd.Run(); err != nil {
 		fmt.Println(err.Error())
 	}
+
+	return err
 }
 
 func Filter() []ec2.Instance {
@@ -116,6 +119,8 @@ func Filter() []ec2.Instance {
 
 		privateIPAddress = strings.TrimSpace(privateIPAddress)
 
+		// fmt.Println(privateIPAddress)
+
 		for _, i := range instances {
 			if *i.PrivateIpAddress == privateIPAddress {
 				filteredInstances = append(filteredInstances,  i)
@@ -129,6 +134,9 @@ func Filter() []ec2.Instance {
 func main() {
 	selectedInstances := Filter()
 	for _, instance := range selectedInstances {
-		ssh(*instance.KeyName, "ubuntu", *instance.PrivateIpAddress)
+		err := ssh(*instance.KeyName, "ubuntu", *instance.PublicIpAddress)
+		if err != nil {
+			err = ssh(*instance.KeyName, "ubuntu", *instance.PrivateIpAddress)
+		}
 	}
 }
