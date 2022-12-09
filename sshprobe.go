@@ -28,12 +28,16 @@ var (
 	err       error
 	user      = flag.String("user", "ubuntu", "Username to use")
 	directory = flag.String("directory", "~/.ssh/", "Directory to find ssh keys")
+	region    = flag.String("region", "us-east-1", "EC2 Region")
 )
 
 func GetInstances() ([]*Instance, error) {
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
+    sess, err := session.NewSession(&aws.Config{
+        Region: region,},
+    )
+	if err != nil {
+		return nil, err
+	}
 
 	svc := ec2.New(sess)
 
