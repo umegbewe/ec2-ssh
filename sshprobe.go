@@ -128,10 +128,11 @@ func Filter() []*Instance {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = &buf
 
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Couldn't call command: %v\n", err)
+	if err := cmd.Run(); cmd.ProcessState.ExitCode() == 130 { 
+		} else if err != nil {
+			fmt.Printf("Couldn't call command: %v\n", err)
 	}
-
+	
 	fzfOutput := buf.String()
 
 	selectedInstances := strings.Split(fzfOutput, " | ")
