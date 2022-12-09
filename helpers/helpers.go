@@ -10,13 +10,13 @@ func StrOrDefault(s *string, defaultVal string) string {
 	}
 }
 
-func GetTagName(inst *ec2.Instance) []string {
+func GetTagName(inst *ec2.Instance) string {
 
-	var nameValues []string
+	var nameValues string
 
 	for _, t := range inst.Tags {
 		if *t.Key == "Name" {
-			nameValues = append(nameValues, *t.Value)
+			nameValues = *t.Value
 		}
 	}
 	return nameValues

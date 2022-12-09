@@ -16,7 +16,7 @@ import (
 )
 
 type Instance struct {
-	Name             []string
+	Name             string
 	PublicIpAddress  *string
 	PrivateIpAddress *string
 	State            *ec2.InstanceState
