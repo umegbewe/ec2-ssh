@@ -15,14 +15,22 @@ import (
 	"fmt"
 )
 
-var ( 
-	instance []string
-	err error
-	user = flag.String("user", "ubuntu", "Username to use")
+type Instance struct {
+	Name             []string
+	PublicIpAddress  *string
+	PrivateIpAddress *string
+	State            *ec2.InstanceState
+	KeyName			 *string
+}
+
+var (
+	instance  []string
+	err       error
+	user      = flag.String("user", "ubuntu", "Username to use")
 	directory = flag.String("directory", "~/.ssh/", "Directory to find ssh keys")
 )
 
-func GetInstances() ([]ec2.Instance, error) {
+func GetInstances() ([]*Instance, error) {
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
@@ -43,7 +51,7 @@ func GetInstances() ([]ec2.Instance, error) {
 		return nil, fmt.Errorf("Couldn't list instances: %v", err)
 	}
 
-	var instances []ec2.Instance
+	var instances []*Instance
 
 	for _, res := range resp.Reservations {
 		if res.Instances == nil {
@@ -55,7 +63,8 @@ func GetInstances() ([]ec2.Instance, error) {
 				continue
 			}
 
-			instance := ec2.Instance{
+			instance := &Instance{
+				Name:             helpers.GetTagName(inst),
 				PrivateIpAddress: inst.PrivateIpAddress,
 				PublicIpAddress:  inst.PublicIpAddress,
 				State:            inst.State,
@@ -72,11 +81,11 @@ func GetInstances() ([]ec2.Instance, error) {
 func ssh(keyname string, user string, address string) error {
 	var err error
 
-	filename := *directory+"/"+keyname+".pem"
+	filename := *directory + "/" + keyname + ".pem"
 
 	/* handle key pair's that might not have the .pem prefix*/
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		filename = *directory+"/"+keyname
+		filename = *directory + "/" + keyname
 	}
 
 	fmt.Println("ssh", "-o ConnectTimeout=5", user+"@"+address, "-i", filename)
@@ -93,7 +102,7 @@ func ssh(keyname string, user string, address string) error {
 	return err
 }
 
-func Filter() []ec2.Instance {
+func Filter() []*Instance {
 	instances, err := GetInstances()
 	if err != nil {
 		fmt.Printf("Couldn't list instances: %v", err)
@@ -101,15 +110,16 @@ func Filter() []ec2.Instance {
 
 	var instanceOutput strings.Builder
 	for _, instance := range instances {
-		instanceOutput.WriteString(fmt.Sprintf("%s | %s | %s | %s\n",
+		instanceOutput.WriteString(fmt.Sprintf("%s | %s | %s | %s | %s \n",
 			helpers.StrOrDefault(instance.PrivateIpAddress, "None"),
 			helpers.StrOrDefault(instance.PublicIpAddress, "None"),
 			*instance.State.Name,
 			helpers.StrOrDefault(instance.KeyName, "None"),
+			instance.Name,
 		))
 	}
 
-	// Convert the instances output to an io.Reader
+	// read buffer
 	instancesReader := strings.NewReader(instanceOutput.String())
 
 	var buf bytes.Buffer
@@ -126,15 +136,15 @@ func Filter() []ec2.Instance {
 
 	selectedInstances := strings.Split(fzfOutput, " | ")
 
-	var filteredInstances []ec2.Instance
+	var filteredInstances []*Instance
 	for _, instance := range selectedInstances {
-		privateIPAddress := strings.Split(instance, "|")[0]
+		privateIPAddress := strings.Split(instance, " | ")[0]
 
 		privateIPAddress = strings.TrimSpace(privateIPAddress)
-		
+
 		for _, i := range instances {
 			if *i.PrivateIpAddress == privateIPAddress {
-				filteredInstances = append(filteredInstances,  i)
+				filteredInstances = append(filteredInstances, i)
 			}
 		}
 	}
@@ -146,9 +156,6 @@ func main() {
 	flag.Parse()
 	selectedInstances := Filter()
 	for _, instance := range selectedInstances {
-		// if *instance.PublicIpAddress == "<nil>" {
-		// 	err = ssh(*instance.KeyName, *user, *instance.PrivateIpAddress)
-		// }
 		err := ssh(*instance.KeyName, *user, *instance.PublicIpAddress)
 		if err != nil {
 			err = ssh(*instance.KeyName, *user, *instance.PrivateIpAddress)
