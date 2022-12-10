@@ -20,7 +20,7 @@ type Instance struct {
 	PublicIpAddress  *string
 	PrivateIpAddress *string
 	State            *ec2.InstanceState
-	KeyName			 *string
+	KeyName          *string
 }
 
 var (
@@ -32,9 +32,9 @@ var (
 )
 
 func GetInstances() ([]*Instance, error) {
-    sess, err := session.NewSession(&aws.Config{
-        Region: region,},
-    )
+	sess, err := session.NewSession(&aws.Config{
+		Region: region},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +132,11 @@ func Filter() []*Instance {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = &buf
 
-	if err := cmd.Run(); cmd.ProcessState.ExitCode() == 130 { 
-		} else if err != nil {
-			fmt.Printf("Couldn't call command: %v\n", err)
+	if err := cmd.Run(); cmd.ProcessState.ExitCode() == 130 {
+	} else if err != nil {
+		fmt.Printf("Couldn't call command: %v\n", err)
 	}
-	
+
 	fzfOutput := buf.String()
 
 	selectedInstances := strings.Split(fzfOutput, " | ")
