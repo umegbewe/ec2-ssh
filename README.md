@@ -14,14 +14,18 @@ Download [binary](https://github.com/umegbewe/ec2-ssh/releases)
 
 To use this tool, simply run the **`ec2-ssh`** command and follow the prompts to select the EC2 instance you want to connect to. By default, the tool will use the **`ubuntu`** user to connect, and it will look for SSH keys in the **`~/.ssh`** directory. You can use the following options to customize the tool's behavior:
 
-```
--user: SSH user to login with. Default user is "ubuntu".
-```
-```
--directory: The directory where SSH keys are stored. Default is "~/.ssh".
-```
-```
--region: The region where the EC2 instances are located. Default is "us-east-1".
+```text
+Usage:
+
+    ec2-ssh [OPTIONS]
+
+Options:
+
+    -user: SSH user to login with. Default user is "ubuntu".
+
+    -directory: The directory where SSH keys are stored. Default is "~/.ssh".
+
+    -region: The region where the EC2 instances are located. Default is "us-east-1".
 ```
 
 For example, to connect to an EC2 instance using the **`ec2-user`** user, SSH keys stored in the **`/home/ubuntu/keys`** directory and region **`us-west-2`**, you could use the following command:
