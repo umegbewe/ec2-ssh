@@ -8,7 +8,12 @@ Command-line tool to easily connect to Amazon EC2 instances via SSH. It uses **[
 
 ## **Install**
 
-Download [binary](https://github.com/umegbewe/ec2-ssh/releases)
+- Download [binaries](https://github.com/umegbewe/ec2-ssh/releases)
+
+- Build:
+```
+go install github.com/umegbewe/ec2-ssh@latest
+```
 
 ## **Usage**
 
