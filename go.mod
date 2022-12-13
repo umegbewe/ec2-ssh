@@ -1,4 +1,4 @@
-module github.com/umegbewe/sshprobe
+module github.com/umegbewe/ec2-ssh
 
 go 1.19
 
