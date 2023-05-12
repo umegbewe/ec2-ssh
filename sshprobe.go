@@ -139,13 +139,14 @@ func Filter() []*Instance {
 
 	fzfOutput := buf.String()
 
-	selectedInstances := strings.Split(fzfOutput, " | ")
+	selectedInstances := strings.Split(fzfOutput, " | \n")
 
 	var filteredInstances []*Instance
 	for _, instance := range selectedInstances {
 		privateIPAddress := strings.Split(instance, " | ")[0]
 
 		privateIPAddress = strings.TrimSpace(privateIPAddress)
+		privateIPAddress = strings.Trim(privateIPAddress, "\n")
 
 		for _, i := range instances {
 			if *i.PrivateIpAddress == privateIPAddress {
@@ -161,9 +162,16 @@ func main() {
 	flag.Parse()
 	selectedInstances := Filter()
 	for _, instance := range selectedInstances {
-		err := ssh(*instance.KeyName, *user, *instance.PublicIpAddress)
-		if err != nil {
-			err = ssh(*instance.KeyName, *user, *instance.PrivateIpAddress)
+		if instance.PublicIpAddress != nil {
+			err := ssh(*instance.KeyName, *user, *instance.PublicIpAddress)
+			if err != nil {
+				err = ssh(*instance.KeyName, *user, *instance.PrivateIpAddress)
+			}
+		} else {
+			err := ssh(*instance.KeyName, *user, *instance.PrivateIpAddress)
+			if err != nil {
+				fmt.Println("Error: ", err.Error())
+			}
 		}
 	}
 }
